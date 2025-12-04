@@ -1005,7 +1005,7 @@
 
         btnLogout.addEventListener('click', () => {
             session = null; persistSession(); if (ws) ws.close(); ws = null;
-            location.replace("login/login.html")
+            location.replace("public/login/login.html")
         });
 
         btnNewGroup.addEventListener('click', async () => {
@@ -1070,7 +1070,7 @@
                 connectWs();
             } else {
                 // redirect to login
-                location.replace("login/login.html");
+                location.replace("public/login/login.html");
             }
             renderMessages();
         })();
