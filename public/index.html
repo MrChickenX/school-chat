@@ -1,0 +1,1113 @@
+<!doctype html>
+<html lang="de">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Chat</title>
+    <style>
+        :root {
+            --bg: #f3f6fb;
+            --card: #fff;
+            --muted: #6b7280;
+            --accent: #6696ff;
+            --accent-2: #40e2ff;
+            --radius: 12px;
+            --shadow: 0 8px 26px rgba(16, 24, 40, 0.08);
+            --max-width: calc(100% - 36px);
+            --max-height: calc(100% - 36px);
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: Inter, system-ui, "Segoe UI", Roboto, Arial;
+            background: linear-gradient(180deg, #e9f1ff, #f6f8fb);
+            color: #0f172a
+        }
+
+        /* App layout: left = user pane (settings), center = chat, right = contacts */
+        .app {
+            width: var(--max-width);
+            height: var(--max-height);
+            margin: 18px auto;
+            border-radius: var(--radius);
+            overflow: hidden;
+            background: var(--card);
+            box-shadow: var(--shadow);
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 0;
+        }
+
+        @media (max-width:1100px) {
+            .app {
+                grid-template-columns: 1fr;
+            }
+
+            .main {
+                order: 1;
+                overflow: auto
+            }
+
+            .sidebar-left {
+                order: 3
+            }
+        }
+
+        /* left sidebar (profile + settings) */
+        .sidebar-left {
+            padding: 14px;
+            border-right: 2px solid rgba(16, 24, 40, 0.04);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: linear-gradient(180deg, #fbfdff, #fff)
+        }
+
+        .profile {
+            display: flex;
+            gap: 10px;
+            align-items: center
+        }
+
+        .avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700
+        }
+
+        .metaSmall {
+            font-size: 13px;
+            color: var(--muted)
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer
+        }
+
+        .link {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            cursor: pointer
+        }
+
+        .main {
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        .chatHeader {
+            display: flex;
+            justify-content: space-between;
+            align-items: center
+        }
+
+        .messages {
+            flex: 1 1 auto;
+            overflow: auto;
+            padding: 14px;
+            min-height: 0;
+        }
+
+        .users.scrollSmall,
+        .users {
+            overflow: auto;
+            max-height: calc(100vh - 220px);
+            min-height: 0;
+        }
+
+        #groups {
+            overflow: auto;
+            max-height: calc(100vh - 420px);
+            min-height: 0;
+        }
+
+        .app {
+            height: calc(100vh - 36px);
+        }
+
+        .conversation {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 100%
+        }
+
+        .msg {
+            display: inline-block;
+            padding: 10px 14px;
+            border-radius: 14px;
+            max-width: 72%;
+            word-break: break-word;
+            line-height: 1.25;
+            font-size: 14px;
+            position: relative;
+            box-shadow: 0 6px 18px rgba(2, 6, 23, 0.03)
+        }
+
+        .msg.me {
+            margin-left: auto;
+            background: linear-gradient(180deg, #dbeafe, #bfdbfe);
+            color: #04245a
+        }
+
+        .msg.peer {
+            margin-right: auto;
+            background: #f1f5f9;
+            color: #0f172a
+        }
+
+        .msg .ts {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
+            text-align: right
+        }
+
+        .inputRow {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 12px;
+            border-radius: 10px;
+            border: 2px solid var(--accent);
+            min-width: 0
+        }
+
+        .fileBtn {
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid rgba(2, 6, 23, 0.06);
+            cursor: pointer;
+            background: #fff
+        }
+
+        /* right sidebar: contacts */
+        .contacts {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .searchRow {
+            display: flex;
+            gap: 8px
+        }
+
+        .users {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow: auto;
+            padding-right: 6px;
+            min-height: 0
+        }
+
+        .userItem {
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            cursor: pointer;
+            transition: background .12s
+        }
+
+        .userItem:hover {
+            background: rgba(37, 99, 235, 0.04)
+        }
+
+        .userItem.active {
+            background: rgba(37, 99, 235, 0.10)
+        }
+
+        .uavatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: #eef2ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0
+        }
+
+        .uinfo {
+            flex: 1;
+            min-width: 0
+        }
+
+        .status {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .scrollSmall {
+            overflow: auto
+        }
+
+        /* small screens tweaks */
+        @media (max-width:600px) {
+            .avatar {
+                width: 48px;
+                height: 48px
+            }
+
+            .uavatar {
+                width: 40px;
+                height: 40px
+            }
+
+            .app {
+                min-height: 100vh
+            }
+
+            .messages {
+                padding: 10px
+            }
+
+            .msg {
+                border-radius: 12px
+            }
+        }
+
+        /* Login overlay */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 40
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            background: var(--card);
+            padding: 20px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 6px
+        }
+
+        input[type=text],
+        input[type=password],
+        input[type=file],
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid var(--accent)
+        }
+
+        .muted {
+            font-size: 13px;
+            color: var(--muted)
+        }
+
+        .small {
+            font-size: 13px
+        }
+
+        .rightSmall {
+            text-align: right
+        }
+
+        code.small {
+            background: #f3f4f6;
+            padding: 4px;
+            border-radius: 6px
+        }
+
+        .title {
+            font-size: 24px;
+            font-weight: 600
+        }
+
+        .smallDangerBtn {
+            background: #c62828;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .smallDangerBtn:hover {
+            background: #b71c1c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app" role="application">
+        <aside class="sidebar-left">
+            <div class="profile">
+                <div class="avatar" id="avatar">ME</div>
+                <div style="flex:1;min-width:0">
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <strong id="displayName"></strong>
+                        <button class="btn" id="openSettings">Einstellungen</button>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="metaSmall">Aktionen</div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                    <button id="btnNewGroup" class="btn">Gruppe erstellen</button>
+                </div>
+            </div>
+
+            <aside class="contacts" aria-label="Kontakte">
+                <div class="row searchRow">
+                    <input id="searchInput" type="text" placeholder="Kontakte durchsuchen..." class="input" />
+                </div>
+
+                <div style="display:flex;gap:8px">
+                    <input id="addUserInput" type="text" placeholder="Benutzername hinzufügen" class="input" />
+                    <button id="addUserBtn" class="btn">Hinzufügen</button>
+                </div>
+
+                <div class="users scrollSmall" id="users" role="list" aria-label="Benutzerliste"></div>
+
+                <div id="groups" class="users scrollSmall"></div>
+            </aside>
+        </aside>
+        <main class="main" aria-live="polite">
+            <div class="chatHeader">
+                <div>
+                    <div id="chatWith" class="title">Wähle einen Kontakt</div>
+                    <div id="chatHint" class="metaSmall">Status: nicht verbunden</div>
+                    <button id="clearChatBtn" class="smallDangerBtn">Chat löschen</button>
+                </div>
+            </div>
+
+            <div class="messages" id="messages" role="log" aria-live="polite" aria-atomic="false">
+                <!-- messages here -->
+            </div>
+
+            <div>
+                <div class="inputRow">
+                    <input id="messageInput" class="input" placeholder="Nachricht..." />
+                    <input id="fileInput" type="file" style="display:none" />
+                    <button id="attachBtn" class="fileBtn" title="Datei anhängen"><svg
+                            xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                            fill="#000000">
+                            <path
+                                d="M720-330q0 104-73 177T470-80q-104 0-177-73t-73-177v-370q0-75 52.5-127.5T400-880q75 0 127.5 52.5T580-700v350q0 46-32 78t-78 32q-46 0-78-32t-32-78v-370h80v370q0 13 8.5 21.5T470-320q13 0 21.5-8.5T500-350v-350q-1-42-29.5-71T400-800q-42 0-71 29t-29 71v370q-1 71 49 120.5T470-160q70 0 119-49.5T640-330v-390h80v390Z" />
+                        </svg></button>
+                    <button id="sendBtn" class="btn">Senden</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal (hidden) -->
+    <div id="settingsOverlay" class="overlay" style="display:none">
+        <div class="card" role="document">
+
+            <!-- ====================================== -->
+            <h3>Einstellungen</h3>
+            <div>
+                <label>Anzeigename</label>
+                <input id="setNick" type="text" />
+            </div>
+            <div>
+                <label>Neues Passwort (optional)</label>
+                <input id="setPass" type="password" />
+            </div>
+            <div>
+                <button id="btnLogout" class="btn" style="background:#ef4444">Abmelden</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+                <button id="saveSettings" class="btn">Speichern</button>
+                <button id="closeSettings" class="btn" style="background:#94a3b8">Schliessen</button>
+            </div>
+            <div style="margin-top:8px" class="muted small">Deine ID: <code id="settingsId" class="small">—</code></div>
+        </div>
+    </div>
+
+    <script>
+
+        const WS_PROD = "wss://hebrew-committed-crew-awareness.trycloudflare.com/ws";
+
+        /* -------------------------
+           Storage keys & helpers
+           ------------------------- */
+        const DEV_KEY = 'schoolChatDeviceId';
+        const MSG_KEY = 'schoolChat_messages_v2';
+        const SESSION_KEY = 'schoolChat_session_v1';
+        const MAX_FILE_BYTES = 50 * 1024 * 1024; // 50MB
+
+        function abToBase64(buf) { const bytes = new Uint8Array(buf); let s = ''; for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s); }
+        function base64ToAb(b64) { const bin = atob(b64); const len = bin.length; const out = new Uint8Array(len); for (let i = 0; i < len; i++) out[i] = bin.charCodeAt(i); return out.buffer; }
+        function concatBuffers(a, b) { const A = new Uint8Array(a), B = new Uint8Array(b); const C = new Uint8Array(A.length + B.length); C.set(A, 0); C.set(B, A.length); return C.buffer; }
+        function fmtTime(ts) { const d = new Date(ts); return d.toLocaleString(); }
+        function uuidv4() { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8); return v.toString(16); }); }
+
+        /* -------------------------
+           UI refs
+           ------------------------- */
+        const settingsOverlay = document.getElementById('settingsOverlay');
+        const openSettings = document.getElementById('openSettings');
+        const closeSettings = document.getElementById('closeSettings');
+        const saveSettings = document.getElementById('saveSettings');
+        const setNick = document.getElementById('setNick');
+        const setPass = document.getElementById('setPass');
+        const settingsIdEl = document.getElementById('settingsId');
+
+        const avatarEl = document.getElementById('avatar');
+        const displayNameEl = document.getElementById('displayName');
+
+        const usersEl = document.getElementById('users');
+        const groupsEl = document.getElementById('groups');
+        const searchInput = document.getElementById('searchInput');
+        const addUserInput = document.getElementById('addUserInput');
+        const addUserBtn = document.getElementById('addUserBtn');
+
+        const chatWithEl = document.getElementById('chatWith');
+        const chatHint = document.getElementById('chatHint');
+        const messagesEl = document.getElementById('messages');
+        const msgInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const attachBtn = document.getElementById('attachBtn');
+        const fileInput = document.getElementById('fileInput');
+
+        const btnLogout = document.getElementById('btnLogout');
+        const btnNewGroup = document.getElementById('btnNewGroup');
+
+        /* -------------------------
+           App state
+           ------------------------- */
+        let session = null; // { token, id, username, nick }
+        let ws = null;
+        let users = []; // last server-sent list (personalized)
+        let groups = []; // server groups
+        let myKeyPair = null;
+        let myPubB64 = null;
+        const peerPublicCache = new Map();
+        const aesKeyCache = new Map();
+        let activePeer = null; // either userId or 'group:<groupId>'
+        let messages = {}; // messages[targetId] = [{from,text,ts,encrypted,attachment?}]
+
+        // load persisted messages and session
+        try { const raw = localStorage.getItem(MSG_KEY); if (raw) messages = JSON.parse(raw) || {}; } catch (e) { messages = {}; }
+        try { session = JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { session = null }
+
+        function persistSession() { if (session) localStorage.setItem(SESSION_KEY, JSON.stringify(session)); else localStorage.removeItem(SESSION_KEY); }
+        function persistMessages() { try { localStorage.setItem(MSG_KEY, JSON.stringify(messages)); } catch (e) { console.warn('persist failed', e); } }
+
+        /* -------------------------
+           Crypto helpers (existing)
+           ------------------------- */
+        // Persistente Keypair-Erzeugung / Wiederherstellung
+        async function genKeypair() {
+            // Versuche gespeichertes JWK-Paar zu laden
+            try {
+                const raw = localStorage.getItem(DEV_KEY + '_jwk');
+                if (raw) {
+                    const jwks = JSON.parse(raw);
+                    if (jwks && jwks.private && jwks.public) {
+                        try {
+                            const priv = await crypto.subtle.importKey(
+                                'jwk',
+                                jwks.private,
+                                { name: 'ECDH', namedCurve: 'P-256' },
+                                true,
+                                ['deriveKey']
+                            );
+                            const pub = await crypto.subtle.importKey(
+                                'jwk',
+                                jwks.public,
+                                { name: 'ECDH', namedCurve: 'P-256' },
+                                true,
+                                []
+                            );
+                            myKeyPair = { privateKey: priv, publicKey: pub };
+                            // erzeugen des public raw (base64) damit server/storePublic kompatibel ist
+                            const pubRaw = await crypto.subtle.exportKey('raw', myKeyPair.publicKey);
+                            myPubB64 = abToBase64(pubRaw);
+                            console.log('[crypto] restored keypair from storage');
+                            // push to server if ws ready
+                            if (ws && ws.readyState === WebSocket.OPEN && session) {
+                                try { ws.send(JSON.stringify({ type: 'storePublic', publicKey: myPubB64, token: session.token })); } catch (e) { console.warn('storePublic failed', e); }
+                            }
+                            return;
+                        } catch (e) {
+                            console.warn('[crypto] failed to import stored jwk, generating new pair', e);
+                        }
+                    }
+                }
+            } catch (e) { console.warn('[crypto] load jwk failed', e); }
+
+            // wenn kein gültiges Paar vorhanden: neu generieren und speichern
+            myKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+            // export raw public for server (existing protocol)
+            const pub = await crypto.subtle.exportKey('raw', myKeyPair.publicKey);
+            myPubB64 = abToBase64(pub);
+            // export jwk for private + public for persistence
+            try {
+                const privJwk = await crypto.subtle.exportKey('jwk', myKeyPair.privateKey);
+                const pubJwk = await crypto.subtle.exportKey('jwk', myKeyPair.publicKey);
+                localStorage.setItem(DEV_KEY + '_jwk', JSON.stringify({ private: privJwk, public: pubJwk }));
+                console.log('[crypto] generated new keypair and saved to storage');
+            } catch (e) {
+                console.warn('[crypto] failed to export/store jwk', e);
+            }
+            // push to server if connected
+            if (ws && ws.readyState === WebSocket.OPEN && session) {
+                try { ws.send(JSON.stringify({ type: 'storePublic', publicKey: myPubB64, token: session.token })); } catch (e) { console.warn('storePublic failed', e); }
+            }
+        }
+
+        async function deriveForPeer(peerId) {
+            const pid = String(peerId);
+            if (aesKeyCache.has(pid)) return aesKeyCache.get(pid);
+
+            // ensure we have our keypair (should be true)
+            if (!myKeyPair) {
+                await genKeypair();
+            }
+
+            // request public if not cached
+            if (!peerPublicCache.has(pid)) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    try { ws.send(JSON.stringify({ type: 'getPublic', target: pid, token: session ? session.token : undefined })); } catch (e) { console.warn('getPublic send failed', e); }
+                }
+                // wait for a bit for server to respond / users push
+                for (let i = 0; i < 60; i++) {
+                    if (peerPublicCache.has(pid)) break;
+                    await new Promise(r => setTimeout(r, 100));
+                }
+            }
+
+            const peerVal = peerPublicCache.get(pid);
+            if (!peerVal) throw new Error('peer public missing — kein public key für ' + pid);
+
+            let peerKey;
+            try {
+                // determine format: if looks like JSON it's JWK, otherwise assume base64 raw
+                if (typeof peerVal === 'string' && peerVal.trim().startsWith('{')) {
+                    const jwk = JSON.parse(peerVal);
+                    peerKey = await crypto.subtle.importKey('jwk', jwk, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+                } else {
+                    // base64 raw -> import as raw
+                    const buf = base64ToAb(peerVal);
+                    peerKey = await crypto.subtle.importKey('raw', buf, { name: 'ECDH', namedCurve: 'P-256' }, true, []);
+                }
+            } catch (e) {
+                console.error('[crypto] failed to import peer public for', pid, e);
+                throw new Error('peer public import failed');
+            }
+
+            // derive AES-GCM key
+            const aesKey = await crypto.subtle.deriveKey({ name: 'ECDH', public: peerKey }, myKeyPair.privateKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+            aesKeyCache.set(pid, aesKey);
+            return aesKey;
+        }
+
+
+
+        /* -------------------------
+           UI rendering helpers (contacts first)
+           ------------------------- */
+        function renderUsers(filter = '') {
+            usersEl.innerHTML = '';
+            if (!Array.isArray(users)) return;
+            const contacts = users.filter(u => u.isContact).filter(u => (u.nick || u.username || '').toLowerCase().includes(filter.toLowerCase()));
+            const others = users.filter(u => !u.isContact).filter(u => (u.nick || u.username || '').toLowerCase().includes(filter.toLowerCase()));
+
+            // render contacts with header
+            if (contacts.length) {
+                const h = document.createElement('div'); h.className = 'metaSmall'; h.textContent = 'Kontakte'; usersEl.appendChild(h);
+                contacts.forEach(renderUserItem);
+            }
+            // render others with header
+            if (others.length) {
+                const h = document.createElement('div'); h.className = 'metaSmall'; h.textContent = 'Andere'; usersEl.appendChild(h);
+                others.forEach(renderUserItem);
+            }
+        }
+
+        function renderUserItem(u) {
+            const idStr = String(u.id);
+            const div = document.createElement('div'); div.className = 'userItem' + (String(activePeer) === idStr ? ' active' : ''); div.dataset.id = idStr;
+            const initials = (u.nick || u.username || '').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
+            div.innerHTML = `<div class="uavatar" aria-hidden="true">${initials}</div>
+      <div class="uinfo"><div style="font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden">${escapeHtml(u.nick || u.username)}</div>
+      <div class="status">${u.online ? 'online' : 'offline'}${u.isContact ? ' • Kontakt' : ''}</div></div>`;
+            div.addEventListener('click', () => selectPeer(u.id));
+            usersEl.appendChild(div);
+        }
+
+        function renderGroups(filter = '') {
+            groupsEl.innerHTML = '';
+            const q = filter.toLowerCase();
+            const matched = groups.filter(g => {
+                if (!q) return true;
+                if ((g.name || '').toLowerCase().includes(q)) return true;
+                // check members' username/nick
+                for (const mid of g.members) {
+                    const u = users.find(u => String(u.id) === String(mid));
+                    const label = (u && (u.nick || u.username)) || '';
+                    if (label.toLowerCase().includes(q)) return true;
+                }
+                return false;
+            });
+
+            if (matched.length) {
+                const h = document.createElement('div'); h.className = 'metaSmall'; h.textContent = 'Gruppen'; groupsEl.appendChild(h);
+            }
+            matched.forEach(g => {
+                const div = document.createElement('div');
+                div.className = 'userItem' + (activePeer === ('group:' + g.id) ? ' active' : '');
+                const initials = (g.name || 'G').slice(0, 2).toUpperCase();
+                const memberLabels = g.members.map(id => {
+                    const u = users.find(x => String(x.id) === String(id));
+                    return u ? (u.nick || u.username) : ('id:' + id);
+                }).slice(0, 5);
+                div.innerHTML = `<div class="uavatar">${escapeHtml(initials)}</div>
+          <div class="uinfo"><div style="font-weight:600">${escapeHtml(g.name)}</div><div class="status">${g.members.length} Mitglieder</div></div>`;
+                div.addEventListener('click', () => selectGroup(g.id));
+                groupsEl.appendChild(div);
+            });
+        }
+
+        function renderMessages() {
+            messagesEl.innerHTML = '';
+            if (!activePeer) { chatWithEl.textContent = 'Wähle einen Kontakt'; chatHint.textContent = 'Status: nicht verbunden'; return; }
+            let peer = null, isGroup = false;
+            if (typeof activePeer === 'string' && activePeer.startsWith('group:')) { isGroup = true; const gid = activePeer.slice(6); peer = groups.find(g => g.id === gid) || { name: 'Gruppe' }; chatWithEl.textContent = 'Gruppe: ' + (peer.name || ''); }
+            else { peer = users.find(u => String(u.id) === String(activePeer)) || {}; chatWithEl.textContent = 'Chat mit ' + (peer ? (peer.nick || peer.username || 'User') : ''); }
+            const key = isGroup ? ('group:' + (activePeer.slice(6))) : String(activePeer);
+            const convo = messages[key] || [];
+            const container = document.createElement('div'); container.className = 'conversation';
+            convo.forEach(m => {
+                const div = document.createElement('div'); div.className = 'msg ' + (String(m.from) === String(session?.id) ? 'me' : 'peer');
+                if (m.attachment) {
+                    const attach = document.createElement('div');
+                    attach.innerHTML = `<div style="font-weight:600">${escapeHtml(m.text || '(Anhang)')}</div>
+            <div><a href="${m.attachment.url}" target="_blank" rel="noopener">${escapeHtml(m.attachment.name)}</a> — ${Math.round(m.attachment.size / 1024)} KB</div>`;
+                    div.appendChild(attach);
+                } else {
+                    const c = document.createElement('div'); c.textContent = m.text; div.appendChild(c);
+                }
+                const ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = fmtTime(m.ts || Date.now()); div.appendChild(ts);
+                container.appendChild(div);
+            });
+            messagesEl.appendChild(container);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        /* -------------------------
+           Utility
+           ------------------------- */
+        function escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+        function setStatus(s) { chatHint.textContent = 'Status: ' + s; }
+
+        /* -------------------------
+           WebSocket & server interaction
+           ------------------------- */
+        function connectWs() {
+            if (!session) return;
+            // PROD_WS (oben) enthält bereits ws(s)://host
+            const base = PROD_WS.replace(/\/$/, ''); // z.B. "wss://abcd.ngrok-free.app" oder "ws://localhost:8787"
+            const url = base + '/ws?token=' + encodeURIComponent(session.token);
+
+            console.log('Connecting WS to', url);
+            ws = new WebSocket(url);
+
+            ws.addEventListener('open', async () => {
+                console.log('ws open');
+                setStatus('verbunden');
+                if (!myKeyPair) await genKeypair();
+                if (myPubB64 && ws.readyState === WebSocket.OPEN) {
+                    try { ws.send(JSON.stringify({ type: 'storePublic', publicKey: myPubB64, token: session.token })); }
+                    catch (e) { console.warn('storePublic send failed', e); }
+                }
+            });
+
+            ws.addEventListener('message', ev => {
+                try {
+                    const msg = JSON.parse(ev.data);
+                    console.log('[ws incoming]', msg);
+
+                    if (msg.type === 'users') {
+                        (msg.list || []).forEach(u => { if (u.publicKey) peerPublicCache.set(String(u.id), u.publicKey); });
+                        users = msg.list || [];
+                        renderUsers(searchInput.value);
+                        renderMessages();
+                    } else if (msg.type === 'publicResponse') {
+                        if (msg.publicKey) peerPublicCache.set(String(msg.target), msg.publicKey);
+                    } else if (msg.type === 'msg') {
+                        // If payload missing -> store a placeholder and show UI update
+                        if (!msg.payload) {
+                            console.warn('[client] incoming msg without payload from', msg.from);
+                            const targetKey = msg.meta && msg.meta.groupId ? ('group:' + msg.meta.groupId) : String(msg.from);
+                            messages[targetKey] = messages[targetKey] || [];
+                            messages[targetKey].push({ from: msg.from, text: '*** Nachricht konnte nicht entschlüsselt werden (kein Payload) ***', ts: msg.ts || Date.now(), encrypted: false, _serverId: msg.id || null });
+                            persistMessages();
+                            renderMessages();
+                            return;
+                        }
+                        // Normal incoming encrypted message
+                        handleIncomingMsg(msg.from, msg.payload, msg.meta).then(() => {
+                            // after attempting decryption, ensure UI is updated
+                            renderMessages();
+                        }).catch(err => {
+                            console.error('[client] handleIncomingMsg failed', err);
+                            // fallback: store placeholder so user sees something
+                            const targetKey = msg.meta && msg.meta.groupId ? ('group:' + msg.meta.groupId) : String(msg.from);
+                            messages[targetKey] = messages[targetKey] || [];
+                            messages[targetKey].push({ from: msg.from, text: '*** Nachricht konnte nicht entschlüsselt werden ***', ts: msg.ts || Date.now(), encrypted: false, _serverId: msg.id || null });
+                            persistMessages();
+                            renderMessages();
+                        });
+                    } else if (msg.type === 'msg_ack') {
+                        console.log('[msg_ack]', msg);
+                        // mark latest local message as delivered if possible (optional)
+                        const pid = String(msg.to);
+                        const convo = messages[pid] || [];
+                        for (let i = convo.length - 1; i >= 0; i--) {
+                            if (convo[i]._localId) { convo[i].delivered = msg.delivered; break; }
+                        }
+                        persistMessages(); renderMessages();
+                    } else if (msg.type === 'msg_error') {
+                        console.warn('[msg_error]', msg);
+                        alert('Server meldet Fehler beim Senden: ' + (msg.error || 'unknown'));
+                    } else if (msg.type === 'groups') {
+                        groups = msg.list || [];
+                        renderGroups(searchInput.value || '');
+                    } else if (msg.type === 'intro') {
+                        console.log('[ws intro]', msg.id);
+                    } else {
+                        console.log('[ws unknown]', msg);
+                    }
+                } catch (e) {
+                    console.error('ws parse', e, ev.data);
+                }
+            });
+        }
+
+        /* -------------------------
+           Messaging (encrypt + send)
+           ------------------------- */
+        async function sendMessage() {
+            if (!activePeer) return alert('Wähle zuerst einen Benutzer oder Gruppe');
+            const text = msgInput.value.trim();
+            const fileMeta = msgInput._pendingAttachment || null;
+            if (!text && !fileMeta) return;
+            sendBtn.disabled = true;
+
+            try {
+                // create local temp id for UI tracking (optional)
+                const localId = 'local-' + uuidv4();
+                const tsNow = Date.now();
+
+                if (String(activePeer).startsWith('group:')) {
+                    const gid = activePeer.slice(6);
+                    const group = groups.find(g => g.id === gid);
+                    if (!group) throw new Error('Gruppe nicht gefunden');
+                    // encrypt and send per recipient
+                    for (const memberId of group.members) {
+                        if (String(memberId) === String(session.id)) continue;
+                        const key = await deriveForPeer(memberId);
+                        const payload = await encryptPayload(key, { text, attachment: fileMeta });
+                        // log
+                        console.log('[send] to member', memberId, 'payloadLen', payload.length);
+                        ws.send(JSON.stringify({ type: 'msg', to: String(memberId), payload, meta: { groupId: gid }, token: session.token }));
+                        // store locally under group
+                        const k = 'group:' + gid;
+                        messages[k] = messages[k] || [];
+                        messages[k].push({ from: session.id, text: text || '(Anhang)', ts: tsNow, encrypted: true, attachment: fileMeta, _localId: localId });
+                    }
+                    persistMessages(); renderMessages();
+                } else {
+                    const pid = String(activePeer);
+                    const key = await deriveForPeer(pid);
+                    const payload = await encryptPayload(key, { text, attachment: fileMeta });
+                    console.log('[send] to', pid, 'payloadLen', payload.length);
+                    ws.send(JSON.stringify({ type: 'msg', to: pid, payload, token: session.token }));
+                    messages[pid] = messages[pid] || [];
+                    messages[pid].push({ from: session.id, text: text || '(Anhang)', ts: tsNow, encrypted: true, attachment: fileMeta, _localId: localId });
+                    persistMessages(); renderMessages();
+                }
+                msgInput.value = '';
+                msgInput._pendingAttachment = null;
+            } catch (e) {
+                console.error('[sendMessage] error', e);
+                alert('Fehler beim Senden: ' + (e.message || e));
+            } finally {
+                sendBtn.disabled = false;
+                msgInput.focus();
+            }
+        }
+
+
+        async function encryptPayload(aesKey, obj) {
+            const plain = new TextEncoder().encode(JSON.stringify(obj));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plain);
+            return abToBase64(concatBuffers(iv.buffer, cipher));
+        }
+
+        async function decryptPayload(aesKey, payloadB64) {
+            try {
+                const buf = base64ToAb(payloadB64);
+                const u8 = new Uint8Array(buf);
+                if (u8.length < 13) throw new Error('payload zu kurz');
+                const iv = u8.slice(0, 12);
+                const cipher = u8.slice(12).buffer;
+                const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, cipher);
+                const dec = new TextDecoder().decode(plainBuf);
+                return JSON.parse(dec);
+            } catch (e) {
+                console.error('[crypto] decryptPayload failed — length:', (payloadB64 || '').length, 'error:', e);
+                throw e;
+            }
+        }
+
+
+        async function handleIncomingMsg(from, payloadB64, meta) {
+            const targetKey = meta && meta.groupId ? ('group:' + meta.groupId) : String(from);
+            try {
+                // ensure we have a key (will request if missing)
+                const key = await deriveForPeer(from);
+                const data = await decryptPayload(key, payloadB64);
+                messages[targetKey] = messages[targetKey] || [];
+                messages[targetKey].push({ from, text: data.text, ts: Date.now(), encrypted: true, attachment: data.attachment, _serverId: meta && meta.serverId ? meta.serverId : null });
+                persistMessages();
+                // visual highlight for unread if not active
+                if (String(activePeer) !== String(from) && !(activePeer && activePeer === ('group:' + (meta && meta.groupId || '')))) {
+                    const el = document.querySelector('.userItem[data-id="' + String(from) + '"]');
+                    if (el) el.style.background = 'rgba(253,224,71,0.12)';
+                }
+            } catch (e) {
+                console.error('[client] decrypt failed for message from', from, e);
+                // store placeholder so user sees message exists even if decryption failed
+                messages[targetKey] = messages[targetKey] || [];
+                messages[targetKey].push({ from, text: '*** Nachricht konnte nicht entschlüsselt werden ***', ts: Date.now(), encrypted: false });
+                persistMessages();
+            } finally {
+                // always update UI
+                renderMessages();
+            }
+        }
+
+        /* -------------------------
+           Attachments
+           ------------------------- */
+        attachBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', async (ev) => {
+            const f = ev.target.files[0];
+            if (!f) return;
+            if (f.size > MAX_FILE_BYTES) return alert('Datei zu gross (max 50MB).');
+            if (!session) return alert('Nicht angemeldet');
+            const fd = new FormData(); fd.append('file', f);
+            try {
+                const res = await fetch('/api/upload', { method: 'POST', body: fd, headers: { Authorization: 'Bearer ' + session.token } });
+                if (!res.ok) throw new Error('Upload fehlgeschlagen');
+                const json = await res.json();
+                msgInput._pendingAttachment = { id: json.fileId, url: json.url, name: json.name, size: json.size, mime: json.mime };
+                alert('Anhang bereit: ' + json.name);
+            } catch (e) { console.error(e); alert('Upload-Fehler: ' + (e.message || e)); }
+        });
+
+        /* -------------------------
+           UI interactions
+           ------------------------- */
+        sendBtn.addEventListener('click', sendMessage);
+        msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+
+        // Add contact: calls API, server updates contacts and broadcasts personalized users
+        addUserBtn.addEventListener('click', async () => {
+            const name = addUserInput.value.trim(); if (!name) return;
+            if (!session) return alert('Nicht angemeldet');
+            try {
+                const r = await fetch('/api/add_contact', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token }, body: JSON.stringify({ username: name }) });
+                const j = await r.json();
+                if (!r.ok) throw new Error(j.error || 'Fehler');
+                addUserInput.value = '';
+                // server will send updated users list via ws; optionally show quick feedback
+                alert('Kontakt hinzugefügt (wenn Benutzer existiert)');
+            } catch (e) { alert('Fehler: ' + (e.message || e)); }
+        });
+
+        searchInput.addEventListener('input', () => {
+            const q = searchInput.value.trim().toLowerCase();
+            renderUsers(q);
+            renderGroups(q);
+        });
+
+
+        openSettings.addEventListener('click', () => {
+            setNick.value = session?.nick || session?.username || '';
+            settingsIdEl.textContent = session?.id || '—';
+            settingsOverlay.style.display = 'flex';
+        });
+        closeSettings.addEventListener('click', () => settingsOverlay.style.display = 'none');
+        saveSettings.addEventListener('click', async () => {
+            const newNick = setNick.value.trim(); const newPass = setPass.value;
+            try {
+                const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token }, body: JSON.stringify({ nick: newNick, password: newPass }) });
+                const j = await res.json();
+                if (!res.ok) throw new Error(j.error || 'Fehler');
+                session.nick = newNick || session.nick; persistSession();
+                displayNameEl.textContent = session.nick || session.username;
+                settingsOverlay.style.display = 'none';
+                alert('Einstellungen gespeichert');
+                if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'set_nick', nick: session.nick, token: session.token }));
+            } catch (e) { alert('Fehler: ' + (e.message || e)); }
+        });
+
+        btnLogout.addEventListener('click', () => {
+            session = null; persistSession(); if (ws) ws.close(); ws = null;
+            location.replace("login/login.html")
+        });
+
+        btnNewGroup.addEventListener('click', async () => {
+            const name = prompt('Gruppenname? (max 26 Mitglieder)'); if (!name) return;
+            const list = prompt('Mitglieder (Benutzernamen, Komma getrennt) — inkl. dich optional:') || '';
+            const members = list.split(',').map(s => s.trim()).filter(Boolean);
+            try {
+                const res = await fetch('/api/create_group', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token }, body: JSON.stringify({ name, members }) });
+                const j = await res.json();
+                if (!res.ok) throw new Error(j.error || 'Fehler');
+                alert('Gruppe erstellt: ' + j.groupId);
+            } catch (e) { alert('Fehler: ' + (e.message || e)); }
+        });
+
+        // when clicking a user => open 1:1 chat
+        function selectPeer(id) {
+            activePeer = id;
+            document.querySelectorAll('.userItem').forEach(x => x.classList.remove('active'));
+            const el = document.querySelector('.userItem[data-id="' + String(id) + '"]'); if (el) el.classList.add('active');
+            renderMessages();
+            deriveForPeer(id).then(() => setStatus('shared key abgeleitet')).catch(() => setStatus('key fehlt (warte auf publicKey)'));
+        }
+
+        // when clicking a group => show members + option to add
+        function selectGroup(gid) {
+            activePeer = 'group:' + gid;
+            document.querySelectorAll('.userItem').forEach(x => x.classList.remove('active'));
+            renderMessages();
+
+            // find group and show members in chat header; provide 'Mitglied hinzufügen' action
+            const g = groups.find(x => x.id === gid);
+            if (!g) { chatWithEl.textContent = 'Gruppe'; return; }
+            const names = g.members.map(id => {
+                const u = users.find(u => String(u.id) === String(id)) || { username: 'id:' + id };
+                return (u.nick || u.username);
+            });
+            chatWithEl.innerHTML = `Gruppe: <strong>${escapeHtml(g.name)}</strong><div class="muted small">Mitglieder: ${escapeHtml(names.join(', ') || '—')}</div>
+      <button id="addGroupMemberBtn" class="btn" style="margin-left:8px">Mitglied hinzufügen</button>`;
+            const btn = document.getElementById('addGroupMemberBtn');
+            if (btn) {
+                btn.addEventListener('click', async () => {
+                    const uname = prompt('Benutzername des Mitglieds (genau):');
+                    if (!uname) return;
+                    try {
+                        const res = await fetch('/api/group_add_member', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.token }, body: JSON.stringify({ groupId: gid, username: uname }) });
+                        const j = await res.json();
+                        if (!res.ok) throw new Error(j.error || 'Fehler');
+                        alert('Mitglied hinzugefügt');
+                        // server will broadcast groups; groups array will update via WS
+                    } catch (e) { alert('Fehler: ' + (e.message || e)); }
+                });
+            }
+        }
+
+        /* -------------------------
+           Restore session on load
+           ------------------------- */
+        (async function init() {
+            if (session) {
+                displayNameEl.textContent = session.nick || session.username;
+                if (!myKeyPair) await genKeypair();
+                connectWs();
+            } else {
+                // redirect to login
+                location.replace("login/login.html");
+            }
+            renderMessages();
+        })();
+
+        // expose quick debug
+        window._dbg = { messages, session, users, groups };
+
+        const clearChatBtn = document.getElementById('clearChatBtn');
+
+        clearChatBtn.addEventListener('click', () => {
+            if (!activePeer) {
+                alert("Wähle zuerst einen Chat aus.");
+                return;
+            }
+
+            const name = activePeer.startsWith("group:")
+                ? "diese Gruppe"
+                : (users.find(u => String(u.id) === String(activePeer))?.nick ||
+                    users.find(u => String(u.id) === String(activePeer))?.username ||
+                    "dieser Chat");
+
+            if (!confirm(`Willst du den Verlauf von "${name}" wirklich löschen?`)) return;
+
+            // Chatverlauf löschen
+            messages[activePeer] = [];
+
+            // speichern
+            persistMessages();
+
+            // UI refresh
+            renderMessages();
+
+            alert("Chatverlauf gelöscht.");
+        });
+
+    </script>
+
+</body>
+
+</html>
