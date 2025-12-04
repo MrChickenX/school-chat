@@ -63,7 +63,7 @@
         }
         try {
             const q = new URLSearchParams({ username: name }).toString();
-            const res = await fetch('/api/check_username?' + q);
+            const res = await fetch('https://hebrew-committed-crew-awareness.trycloudflare.com/api/check_username?' + q);
             const j = await res.json();
             if (res.ok && j && typeof j.available === 'boolean') {
                 usernameAvailabilityEl.style.color = j.available ? '#065f46' : '#b91c1c';
