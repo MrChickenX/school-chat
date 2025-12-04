@@ -131,7 +131,7 @@
         try {
             const resp = isSignup
                 ? await postJson(BACKEND_URL + '/api/signup', { username, password })
-                : await postJson(BACKEND_URL + '/api/signup', { username, password });
+                : await postJson(BACKEND_URL + '/api/login', { username, password });
 
             if (!resp || !resp.token) throw new Error('Ungültige Server-Antwort');
 
