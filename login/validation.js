@@ -130,8 +130,8 @@
 
         try {
             const resp = isSignup
-                ? await postJson(`${BACKEND_URL}/api/signup`, { username, password })
-                : await postJson(`${BACKEND_URL}/api/login`, { username, password });
+                ? await postJson(BACKEND_URL + '/api/signup', { username, password })
+                : await postJson(BACKEND_URL + '/api/signup', { username, password });
 
             if (!resp || !resp.token) throw new Error('Ungültige Server-Antwort');
 
@@ -142,7 +142,7 @@
                 nick: resp.nick || resp.username
             }));
 
-            window.location.href = '/';
+            window.location.href = '/schoool-chat/';
         } catch (err) {
             showError(err.message || 'Fehler beim Authentifizieren');
         } finally {

@@ -754,7 +754,7 @@
         function connectWs() {
             if (!session) return;
             // PROD_WS (oben) enthält bereits ws(s)://host
-            const base = PROD_WS.replace(/\/$/, ''); // z.B. "wss://abcd.ngrok-free.app" oder "ws://localhost:8787"
+            const PROD_WS = 'wss://hebrew-committed-crew-awareness.trycloudflare.com';
             const url = base + '/ws?token=' + encodeURIComponent(session.token);
 
             console.log('Connecting WS to', url);
