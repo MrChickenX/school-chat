@@ -1,16 +1,17 @@
-// public/login/validation.js
 (() => {
     const form = document.getElementById('form');
     const usernameEl = document.getElementById('username');
     const passwordEl = document.getElementById('password-input');
-    const repeatPasswordEl = document.getElementById('repeat-password-input'); // nur vorhanden bei signup
+    const repeatPasswordEl = document.getElementById('repeat-password-input'); // nur bei signup
     const errorMessageEl = document.getElementById('error-message');
     const submitBtn = document.getElementById('submitBtn');
     const usernameAvailabilityEl = document.getElementById('username-availability'); // nur signup
 
     if (!form) return;
 
-    // debounce helper
+    const BACKEND_URL = 'https://hebrew-committed-crew-awareness.trycloudflare.com';
+
+    // --- Helper ---
     function debounce(fn, ms = 300) {
         let t;
         return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
@@ -45,7 +46,8 @@
     }
 
     async function postJson(url, body) {
-        const res = await fetch(url, {
+        const fullUrl = url.startsWith('http') ? url : BACKEND_URL + url;
+        const res = await fetch(fullUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
@@ -55,7 +57,6 @@
         return j;
     }
 
-    // Check username availability (signup)
     async function checkUsernameAvailability(name) {
         if (!name) {
             usernameAvailabilityEl.textContent = '';
@@ -63,7 +64,7 @@
         }
         try {
             const q = new URLSearchParams({ username: name }).toString();
-            const res = await fetch('https://hebrew-committed-crew-awareness.trycloudflare.com/api/check_username?' + q);
+            const res = await fetch(`${BACKEND_URL}/api/check_username?${q}`);
             const j = await res.json();
             if (res.ok && j && typeof j.available === 'boolean') {
                 usernameAvailabilityEl.style.color = j.available ? '#065f46' : '#b91c1c';
@@ -114,18 +115,11 @@
             return;
         }
 
-        // if signup -> ensure username is available before sending registration
         if (isSignup) {
-            try {
-                const avail = await checkUsernameAvailability(username);
-                if (avail === false) {
-                    showError('Dieser Benutzername ist bereits vergeben. Wähle einen anderen.');
-                    usernameEl.parentElement.classList.add('incorrect');
-                    return;
-                }
-            } catch (e) {
-                // allow proceed on uncertain availability? better block to be safe
-                showError('Fehler beim Prüfen des Benutzernamens. Versuche es erneut.');
+            const avail = await checkUsernameAvailability(username);
+            if (avail === false) {
+                showError('Dieser Benutzername ist bereits vergeben. Wähle einen anderen.');
+                usernameEl.parentElement.classList.add('incorrect');
                 return;
             }
         }
@@ -135,15 +129,12 @@
         submitBtn.textContent = isSignup ? 'Registriere...' : 'Anmelden...';
 
         try {
-            let resp;
-            if (isSignup) {
-                resp = await postJson('/api/signup', { username, password });
-            } else {
-                resp = await postJson('/api/login', { username, password });
-            }
+            const resp = isSignup
+                ? await postJson('/api/signup', { username, password })
+                : await postJson('/api/login', { username, password });
+
             if (!resp || !resp.token) throw new Error('Ungültige Server-Antwort');
 
-            // Persist session for the chat UI
             localStorage.setItem('schoolChat_session_v1', JSON.stringify({
                 token: resp.token,
                 id: resp.id,
@@ -151,7 +142,6 @@
                 nick: resp.nick || resp.username
             }));
 
-            // Weiterleitung zur Hauptseite
             window.location.href = '/';
         } catch (err) {
             showError(err.message || 'Fehler beim Authentifizieren');
