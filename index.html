@@ -420,7 +420,7 @@
     </div>
 
     <script>
-        // Helpers
+        // --- helper functions (same as before) ---
         function abToBase64(buf) {
             const bytes = new Uint8Array(buf);
             let s = '';
@@ -461,13 +461,69 @@
         let myId = null;
         let ws = null;
         let users = []; // array of {id,nick,online}
-        let myKeyPair = null; // ECDH
-        let myPubB64 = null; // exported public key
-        const peerPublicCache = new Map(); // id -> base64 public
-        const aesKeyCache = new Map(); // id -> CryptoKey (AES-GCM)
-        let activePeer = null; // id
-        let messages = {}; // messages[peerId] = [{from, text, ts, encrypted}]
+        let myKeyPair = null; // ECDH CryptoKey pair
+        let myPubB64 = null; // exported public key base64
+        let deviceId = null;
+        const peerPublicCache = new Map();
+        const aesKeyCache = new Map();
+        let activePeer = null;
+        let messages = {};
 
+        // --- persist / load keypair + deviceId ---
+        async function loadOrCreateKeypair() {
+            // keys stored in localStorage as base64:
+            // sc_deviceId, sc_priv (pkcs8 base64), sc_pub (raw base64), sc_nick (optional)
+            deviceId = localStorage.getItem('sc_deviceId');
+            const privB64 = localStorage.getItem('sc_priv');
+            const pubB64 = localStorage.getItem('sc_pub');
+            if (deviceId && privB64 && pubB64) {
+                try {
+                    // import private key (pkcs8)
+                    const privBuf = base64ToAb(privB64);
+                    const privateKey = await crypto.subtle.importKey(
+                        'pkcs8', privBuf,
+                        { name: 'ECDH', namedCurve: 'P-256' },
+                        true, ['deriveKey']
+                    );
+                    // import public key (raw)
+                    const pubBuf = base64ToAb(pubB64);
+                    const publicKey = await crypto.subtle.importKey(
+                        'raw', pubBuf,
+                        { name: 'ECDH', namedCurve: 'P-256' },
+                        true, []
+                    );
+                    myKeyPair = { privateKey, publicKey };
+                    myPubB64 = pubB64;
+                    console.log('loaded keypair from localStorage, deviceId', deviceId);
+                    return;
+                } catch (e) {
+                    console.warn('failed to import keys, will regenerate', e);
+                    // fallthrough to generate new
+                }
+            }
+
+            // no stored keys -> generate new and store
+            const kp = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
+            const pub = await crypto.subtle.exportKey('raw', kp.publicKey);
+            const priv = await crypto.subtle.exportKey('pkcs8', kp.privateKey);
+            myKeyPair = kp;
+            myPubB64 = abToBase64(pub);
+            const privB64New = abToBase64(priv);
+            // device id
+            if (crypto && crypto.randomUUID) {
+                deviceId = crypto.randomUUID();
+            } else {
+                // fallback
+                deviceId = 'dev-' + Math.random().toString(36).slice(2, 10);
+            }
+            // store
+            localStorage.setItem('sc_deviceId', deviceId);
+            localStorage.setItem('sc_priv', privB64New);
+            localStorage.setItem('sc_pub', myPubB64);
+            console.log('generated and stored new keypair, deviceId', deviceId);
+        }
+
+        // --- UI renderers (unchanged except small adapt) ---
         function renderUsers() {
             usersEl.innerHTML = '';
             users.forEach(u => {
@@ -479,8 +535,8 @@
                 const displayName = u.nick || ('User ' + u.id);
                 const initials = String(displayName).split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase();
                 div.innerHTML = `<div class="uavatar" aria-hidden="true">${initials}</div>
-          <div class="uinfo"><div class="name">${escapeHtml(displayName)}</div>
-          <div class="status">${u.online ? 'online' : 'offline'}</div></div>`;
+        <div class="uinfo"><div class="name">${escapeHtml(displayName)}</div>
+        <div class="status">${u.online ? 'online' : 'offline'}</div></div>`;
                 div.addEventListener('click', () => selectPeer(u.id));
                 div.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPeer(u.id); } });
                 usersEl.appendChild(div);
@@ -502,7 +558,6 @@
             convo.forEach(m => {
                 const div = document.createElement('div');
                 div.className = 'msg ' + (m.from === myId ? 'me' : 'peer');
-                // message text + small timestamp
                 const content = document.createElement('div');
                 content.textContent = m.text;
                 const ts = document.createElement('span');
@@ -513,7 +568,6 @@
                 container.appendChild(div);
             });
             messagesEl.appendChild(container);
-            // scroll to bottom
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
 
@@ -524,24 +578,11 @@
             });
         }
 
-        // Crypto: generate ECDH keypair and export public key
-        async function genKeypair() {
-            myKeyPair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']);
-            const pub = await crypto.subtle.exportKey('raw', myKeyPair.publicKey);
-            myPubB64 = abToBase64(pub);
-            // send to server for storage
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                try { ws.send(JSON.stringify({ type: 'storePublic', publicKey: myPubB64 })); } catch (e) { console.warn('storePublic send failed', e); }
-            }
-        }
-
-        // Derive AES key for peer
+        // Derive AES key for peer (unchanged)
         async function deriveForPeer(peerId) {
             if (aesKeyCache.has(peerId)) return aesKeyCache.get(peerId);
-            // get peer public from server if not cached
             if (!peerPublicCache.has(peerId)) {
                 if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'getPublic', target: peerId }));
-                // wait briefly for response (poll)
                 for (let i = 0; i < 30; i++) { if (peerPublicCache.has(String(peerId))) break; await new Promise(r => setTimeout(r, 100)); }
             }
             const peerB64 = peerPublicCache.get(String(peerId)) || peerPublicCache.get(Number(peerId));
@@ -553,7 +594,7 @@
             return aesKey;
         }
 
-        // Encrypt and send
+        // sendMessage (unchanged)
         async function sendMessage() {
             if (!activePeer) return alert('Wähle zuerst einen Benutzer');
             const text = msgInput.value.trim(); if (!text) return;
@@ -569,8 +610,6 @@
                 } else {
                     throw new Error('WebSocket nicht verbunden');
                 }
-
-                // add to local convo
                 messages[activePeer] = messages[activePeer] || [];
                 messages[activePeer].push({ from: myId, text, ts: Date.now(), encrypted: true });
                 renderMessages(); msgInput.value = '';
@@ -578,7 +617,7 @@
             finally { sendBtn.disabled = false; msgInput.focus(); }
         }
 
-        // Receive encrypted message from server
+        // Incoming
         async function handleIncomingMsg(from, payload) {
             try {
                 const key = await deriveForPeer(from);
@@ -590,7 +629,6 @@
                 const dec = new TextDecoder().decode(plainBuf);
                 messages[from] = messages[from] || [];
                 messages[from].push({ from, text: dec, ts: Date.now(), encrypted: true });
-                // highlight in user list if not active
                 if (activePeer !== from) {
                     const el = document.querySelector('.userItem[data-id="' + from + '"]');
                     if (el) el.style.background = 'rgba(253,224,71,0.12)';
@@ -603,45 +641,44 @@
 
         function selectPeer(id) {
             activePeer = (typeof id === 'number') ? id : (isNaN(Number(id)) ? id : Number(id));
-            // clear any highlight class (prefer className)
             document.querySelectorAll('.userItem').forEach(x => x.classList.remove('active'));
             const el = document.querySelector('.userItem[data-id="' + id + '"]');
             if (el) el.classList.add('active');
             renderMessages();
-            // try to pre-derive key (best-effort)
             deriveForPeer(activePeer).then(() => { chatHint.textContent = 'Status: shared key abgeleitet'; }).catch(() => { chatHint.textContent = 'Status: key fehlt (warten auf publicKey)'; });
         }
 
-        // WebSocket + lifecycle
-        // Ersetze ALLE vorhandenen setupWS()-Funktionen mit genau diesem Block:
-        function setupWS() {
-            const PROD_WS = 'wss://sister-configurations-bass-lamb.trycloudflare.com/';
-            const LOCAL_WS = 'ws://localhost:8787/';
+        // --- WebSocket setup: now sends register with deviceId & publicKey ---
+        async function setupWS() {
+            await loadOrCreateKeypair(); // ensure myKeyPair & myPubB64 & deviceId exist
+
+            // choose url: local vs prod (you can adapt)
             const useLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const wsUrl = useLocal ? LOCAL_WS : PROD_WS;
-
+            const PRODUCTION_WSS = 'wss://YOUR_WSS_ENDPOINT_HERE/'; // <- replace with your cloudflared trycloudflare url OR domain
+            const LOCAL_WS = 'ws://localhost:8787/';
+            const scheme = useLocal ? LOCAL_WS : PRODUCTION_WSS;
             try {
-                ws = new WebSocket(wsUrl);
-            } catch (e) {
-                console.error('WS init failed', e);
-                chatHint.textContent = 'Status: websocket fehler';
-                return;
-            }
+                ws = new WebSocket(scheme);
+            } catch (e) { console.error('WS init failed', e); chatHint.textContent = 'Status: websocket fehler'; return; }
 
-            ws.addEventListener('open', () => {
-                console.log('WS open ->', wsUrl);
+            ws.addEventListener('open', async () => {
+                console.log('WS open');
                 chatHint.textContent = 'Status: verbunden';
+                // tell server our persistent device id and public key
+                ws.send(JSON.stringify({ type: 'register', id: deviceId, publicKey: myPubB64, nick: nickInput.value || null }));
             });
 
             ws.addEventListener('message', async (ev) => {
                 try {
                     const msg = JSON.parse(ev.data);
                     if (msg.type === 'intro') {
-                        myId = msg.id; myIdEl.textContent = myId; avatarEl.textContent = String(myId).slice(0, 2);
-                        // gen keys and send public key
-                        await genKeypair();
-                        if (nickInput.value) {
-                            try { ws.send(JSON.stringify({ type: 'set_nick', nick: nickInput.value })); } catch (e) { }
+                        // server ack: set myId (should match deviceId, but server might assign fallback)
+                        myId = msg.id;
+                        myIdEl.textContent = myId;
+                        avatarEl.textContent = String(myId).slice(0, 2);
+                        // if server accepted but didn't store my public, send explicit storePublic
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({ type: 'storePublic', publicKey: myPubB64 }));
                         }
                     } else if (msg.type === 'users') {
                         users = msg.list || [];
@@ -656,20 +693,14 @@
                 } catch (e) { console.error('ws message parse', e); }
             });
 
-            ws.addEventListener('close', () => {
-                console.log('WS closed');
-                chatHint.textContent = 'Status: disconnected';
-            });
-
-            ws.addEventListener('error', (e) => {
-                console.error('WS error', e);
-                chatHint.textContent = 'Status: error';
-            });
+            ws.addEventListener('close', () => { console.log('WS closed'); chatHint.textContent = 'Status: disconnected'; });
+            ws.addEventListener('error', (e) => { console.error('WS error', e); chatHint.textContent = 'Status: error'; });
         }
 
-
+        // UI events
         saveNick.addEventListener('click', () => {
             const n = nickInput.value.trim(); if (!n) return;
+            localStorage.setItem('sc_nick', n);
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'set_nick', nick: n }));
             } else {
@@ -680,18 +711,10 @@
         sendBtn.addEventListener('click', sendMessage);
         msgInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
 
-        // Start
+        // start
         setupWS();
-
-        // Make UI usable on mobile: focus handling
-        msgInput.addEventListener('focus', () => { setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 300); });
-
-        // small polyfill for older browsers (optional)
-        if (!window.crypto || !crypto.subtle) {
-            alert('Warning: WebCrypto API nicht verfügbar. Verschlüsselung funktioniert nicht.');
-        }
-
     </script>
+
 </body>
 
 </html>
