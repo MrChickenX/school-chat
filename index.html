@@ -755,7 +755,7 @@
             if (!session) return;
             // PROD_WS (oben) enthält bereits ws(s)://host
             const PROD_WS = 'wss://hebrew-committed-crew-awareness.trycloudflare.com';
-            const url = base + '/ws?token=' + encodeURIComponent(session.token);
+            const url = PROD_WS + '/ws?token=' + encodeURIComponent(session.token);
 
             console.log('Connecting WS to', url);
             ws = new WebSocket(url);
