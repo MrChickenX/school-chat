@@ -142,7 +142,7 @@
                 nick: resp.nick || resp.username
             }));
 
-            window.location.href = '/schoool-chat/';
+            window.location.href = '/school-chat/';
         } catch (err) {
             showError(err.message || 'Fehler beim Authentifizieren');
         } finally {
